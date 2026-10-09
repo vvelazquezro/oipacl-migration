@@ -18,7 +18,7 @@ Each Audit/Migrate/Activate submission runs as an isolated background job with a
 
 ## Prerequisites
 
-- Python 3.11+ (or Docker)
+- Python 3.11+
 - Akamai EdgeGrid API credentials (host, client token, client secret, access token) and an account switch key — entered in the browser per job, not stored in this repo.
 
 ---
@@ -30,15 +30,12 @@ Each Audit/Migrate/Activate submission runs as an isolated background job with a
 ├── webapp/            # Flask web UI: routes, forms, background jobs, templates
 ├── akamai_core/        # Shared PAPI logic: API client, rule-tree transforms, audit/migrate/activate
 ├── AkamaiRequests.py    # Internal Akamai API wrapper library (do not distribute externally)
-├── Dockerfile          # Container image for hosting the web UI
 └── requirements.txt     # Python dependencies
 ```
 
 ---
 
 ## Running Locally
-
-### Option A — Python virtualenv
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -47,18 +44,7 @@ FLASK_SECRET_KEY=dev APP_ROOT_PATH=/ss-migrator python3 app.py
 # visit http://localhost:8080/ss-migrator/
 ```
 
-### Option B — Docker
-
-```bash
-docker build -t ss-migrator .
-docker run --rm -p 8080:8080 \
-  -e APP_ROOT_PATH=/ss-migrator \
-  -e FLASK_SECRET_KEY=<generate-a-random-value> \
-  ss-migrator
-# visit http://localhost:8080/ss-migrator/
-```
-
-The container listens on plain HTTP port `8080` and must be reachable under `APP_ROOT_PATH` (a reverse proxy is expected to forward the full path, including the prefix, without stripping it).
+The app listens on plain HTTP port `8080` and must be reachable under `APP_ROOT_PATH` (a reverse proxy is expected to forward the full path, including the prefix, without stripping it).
 
 ---
 
