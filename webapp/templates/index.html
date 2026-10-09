@@ -1,21 +1,29 @@
 {% extends "base.html" %}
 {% block content %}
 <p>Choose an operation. Credentials are used only for this request and are never stored.</p>
+<p class="field-error {{ '' if not is_ready else 'hidden' }}" id="options-locked-hint">
+  {% if not has_credentials %}Connect your Akamai credentials{% else %}Set an account switch key{% endif %}
+  above to unlock Audit, Migrate, and Activate.
+</p>
 <div class="card-grid">
-  <a class="card" href="{{ url_for('main.audit') }}">
-    <span class="card-badge">A</span>
-    <h2>Audit</h2>
-    <p>Scan properties and report compliance status (OIPACL, Tiered Distribution, SiteShield, SureRoute).</p>
-  </a>
-  <a class="card" href="{{ url_for('main.migrate') }}">
-    <span class="card-badge">M</span>
-    <h2>Migrate</h2>
-    <p>Replace SiteShield with Origin IP ACL + Tiered Distribution, and change SureRoute map.</p>
-  </a>
-  <a class="card" href="{{ url_for('main.activate') }}">
-    <span class="card-badge">Ac</span>
-    <h2>Activate</h2>
-    <p>Activate migrated property versions to staging or production.</p>
-  </a>
+  {% for endpoint, badge, heading, description in [
+    ("main.audit", "A", "Audit", "Scan properties and report compliance status (OIPACL, Tiered Distribution, SiteShield, SureRoute)."),
+    ("main.migrate", "M", "Migrate", "Replace SiteShield with Origin IP ACL + Tiered Distribution, and change SureRoute map."),
+    ("main.activate", "Ac", "Activate", "Activate migrated property versions to staging or production."),
+  ] %}
+    <a class="card option-card {{ '' if is_ready else 'card-disabled' }}" href="{{ url_for(endpoint) }}"
+       title="{% if not is_ready %}{% if not has_credentials %}Connect your Akamai credentials first{% else %}Set an account switch key first{% endif %}{% endif %}">
+      <span class="card-badge">{{ badge }}</span>
+      <h2>{{ heading }}</h2>
+      <p>{{ description }}</p>
+    </a>
+  {% endfor %}
 </div>
+<script>
+  document.querySelectorAll(".option-card").forEach((card) => {
+    card.addEventListener("click", (e) => {
+      if (card.classList.contains("card-disabled")) e.preventDefault();
+    });
+  });
+</script>
 {% endblock %}

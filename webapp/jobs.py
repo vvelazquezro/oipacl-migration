@@ -148,7 +148,9 @@ class JobManager:
 
                 elif job.action == "migrate":
                     result = migrate_properties(client, params["names"], params["version"], params["account_key"],
-                                                 params["notes"], logger, on_progress=on_progress)
+                                                 params["notes"], logger, on_progress=on_progress,
+                                                 enable_td=params.get("enable_td", True),
+                                                 add_oipacl_without_ss=params.get("add_oipacl_without_ss", True))
                     to_activate = result["to_activate"]
                     errors = result["errors"]
 

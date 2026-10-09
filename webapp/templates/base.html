@@ -27,21 +27,26 @@
           {{ account_key_form.csrf_token }}
           <label for="account_switch_key" class="sr-only">Account Switch Key</label>
           <div class="account-key-input-wrap">
-            {{ account_key_form.account_switch_key(id="account_switch_key", placeholder="Account Switch Key (optional)") }}
+            {{ account_key_form.account_switch_key(id="account_switch_key", placeholder="Account Switch Key") }}
             <span id="account-key-check" class="account-key-check" aria-hidden="true"></span>
           </div>
           <div class="field-error" id="account-key-error"></div>
         </form>
       {% endif %}
       <div class="creds-status">
+        {% if is_ready %}
+          <span class="pill pill-ok" id="creds-pill">Ready to use</span>
+        {% elif has_credentials %}
+          <span class="pill pill-info" id="creds-pill">Missing account switch key</span>
+        {% else %}
+          <span class="pill pill-warn" id="creds-pill">Missing credentials</span>
+        {% endif %}
         {% if has_credentials %}
-          <span class="pill pill-ok">Credentials connected</span>
           <button type="button" id="open-creds-btn" class="link-button">Change credentials</button>
           <form method="post" action="{{ url_for('main.clear_credentials') }}" class="inline-form">
             <button type="submit" class="link-button">Disconnect</button>
           </form>
         {% else %}
-          <span class="pill pill-warn">Credentials required</span>
           <button type="button" id="open-creds-btn" class="link-button">Enter credentials</button>
         {% endif %}
       </div>
@@ -164,11 +169,26 @@
         const errorEl = document.getElementById("account-key-error");
         const csrfInput = accountKeyForm.querySelector('input[name="csrf_token"]');
         let lastSavedValue = input.value.trim();
+        let hasAccountKey = Boolean(lastSavedValue);
 
         function setCheckState(state) {
           checkEl.className = "account-key-check " + state;
         }
         if (lastSavedValue) setCheckState("valid");
+
+        function setReadiness(ready) {
+          const pill = document.getElementById("creds-pill");
+          if (pill) {
+            pill.className = "pill " + (ready ? "pill-ok" : "pill-info");
+            pill.textContent = ready ? "Ready to use" : "Missing account switch key";
+          }
+          document.querySelectorAll(".option-card").forEach((card) => {
+            card.classList.toggle("card-disabled", !ready);
+            card.title = ready ? "" : "Set an account switch key first";
+          });
+          const hint = document.getElementById("options-locked-hint");
+          if (hint) hint.classList.toggle("hidden", ready);
+        }
 
         function saveKey(value) {
           if (value === lastSavedValue) return;
@@ -183,6 +203,8 @@
                 errorEl.textContent = "";
                 lastSavedValue = value;
                 setCheckState(value ? "valid" : "idle");
+                hasAccountKey = Boolean(value);
+                setReadiness(hasAccountKey);
               } else {
                 const msgs = (data.errors && data.errors.account_switch_key) || ["Could not save account switch key."];
                 errorEl.textContent = msgs.join(" ");

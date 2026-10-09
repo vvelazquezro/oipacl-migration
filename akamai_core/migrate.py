@@ -11,7 +11,8 @@ ERROR_HEADERS = ["Configuration name", "Configuration version", "Error Detail"]
 
 
 def migrate_properties(client: PapiClient, names: list[str], env_target: str, account_key: str,
-                        notes: str, logger: logging.Logger, on_progress=None) -> dict:
+                        notes: str, logger: logging.Logger, on_progress=None, enable_td: bool = True,
+                        add_oipacl_without_ss: bool = True) -> dict:
     """Evaluates and migrates each property. Returns {"to_activate": [...], "errors": [...]} rows."""
     to_activate = []
     errors = []
@@ -37,7 +38,7 @@ def migrate_properties(client: PapiClient, names: list[str], env_target: str, ac
             has_ss_flag = has_ss(tree)
             has_oipacl_flag = has_oipacl(tree)
             sr_changed = update_sureRoute(tree, logger)
-            needs_oipacl_injection = not has_ss_flag and not has_oipacl_flag
+            needs_oipacl_injection = add_oipacl_without_ss and not has_ss_flag and not has_oipacl_flag
 
             logger.info("Evaluated flags -> SiteShield: %s | Needs OipAcl: %s | SureRoute changed: %s",
                         has_ss_flag, needs_oipacl_injection, sr_changed)
@@ -48,8 +49,9 @@ def migrate_properties(client: PapiClient, names: list[str], env_target: str, ac
                 continue
 
             if has_ss_flag:
-                logger.info("    -> SiteShield behavior detected. Replacing with OriginIpAcl.")
-                tree = replace_siteShield(tree)
+                logger.info("    -> SiteShield behavior detected. Replacing with OriginIpAcl%s.",
+                            " and TieredDistribution" if enable_td else "")
+                tree = replace_siteShield(tree, enable_td=enable_td)
 
             if needs_oipacl_injection:
                 logger.info("    -> OriginIpAcl missing. Injecting into default rule.")

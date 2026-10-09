@@ -23,6 +23,12 @@
 <button type="button" id="toggle-advanced" class="link-button">Open execution logs</button>
 <pre id="log" class="hidden"></pre>
 
+{% if job.action == "migrate" %}
+<div id="back-to-audit" class="hidden">
+  <a id="back-to-audit-link" href="#" class="btn btn-secondary">&larr; Back to audit</a>
+</div>
+{% endif %}
+
 <script>
   const streamUrl = "{{ url_for('main.job_stream', job_id=job.id) }}";
   const filesUrl = "{{ url_for('main.job_files', job_id=job.id) }}";
@@ -39,6 +45,18 @@
     const nowHidden = logEl.classList.toggle("hidden");
     toggleBtn.textContent = nowHidden ? "Open execution logs" : "Hide execution logs";
   });
+
+  if ("{{ job.action }}" === "migrate") {
+    const sourceAuditKey = "ssmigrator:source-audit-job";
+    const auditJobId = sessionStorage.getItem(sourceAuditKey);
+    sessionStorage.removeItem(sourceAuditKey);
+    if (auditJobId) {
+      const backWrap = document.getElementById("back-to-audit");
+      const backLink = document.getElementById("back-to-audit-link");
+      backLink.href = "{{ url_for('main.job_view', job_id='JOB_ID_PLACEHOLDER') }}".replace("JOB_ID_PLACEHOLDER", auditJobId);
+      backWrap.classList.remove("hidden");
+    }
+  }
 
   const source = new EventSource(streamUrl);
 
@@ -96,6 +114,7 @@
         migrateBtn.addEventListener("click", (e) => {
           e.preventDefault();
           sessionStorage.setItem("ssmigrator:prefill-properties", fd.names.join("\n"));
+          sessionStorage.setItem("ssmigrator:source-audit-job", "{{ job.id }}");
           window.location.href = migrateBtn.href;
         });
       }
@@ -109,7 +128,22 @@
   const PASTEL_COLORS = ["#AEE1F9", "#FFD6A5", "#CAFFBF", "#FFADAD", "#BDB2FF", "#FFC6FF", "#9BF6FF", "#FDFFB6"];
 
   function showChartDetail(el, bucket) {
-    el.innerHTML = `<strong>${bucket.label}</strong> (${bucket.count}):\n${bucket.names.join("\n")}`;
+    el.innerHTML = `<button type="button" class="chart-detail-clear" title="Clear filter">&times;</button>` +
+      `<strong>${bucket.label}</strong> (${bucket.count}):\n${bucket.names.join("\n")}`;
+  }
+
+  function clearChartDetail(el, legend) {
+    el.innerHTML = "";
+    legend.querySelectorAll("li.active").forEach((li) => li.classList.remove("active"));
+  }
+
+  function selectBucket(details, legend, liEl, bucket) {
+    const alreadyActive = liEl.classList.contains("active");
+    clearChartDetail(details, legend);
+    if (alreadyActive) return;
+    liEl.classList.add("active");
+    showChartDetail(details, bucket);
+    details.querySelector(".chart-detail-clear").addEventListener("click", () => clearChartDetail(details, legend));
   }
 
   function renderCharts(charts) {
@@ -159,7 +193,7 @@
         swatch.style.background = PASTEL_COLORS[i % PASTEL_COLORS.length];
         li.appendChild(swatch);
         li.appendChild(document.createTextNode(`${b.label} (${b.count})`));
-        li.addEventListener("click", () => showChartDetail(details, b));
+        li.addEventListener("click", () => selectBucket(details, legend, li, b));
         legend.appendChild(li);
       });
 
@@ -171,10 +205,10 @@
         if (angle < 0) angle += 360;
         const pct = (angle / 360) * 100;
         let acc = 0;
-        for (const b of buckets) {
-          acc += (b.count / total) * 100;
+        for (let i = 0; i < buckets.length; i++) {
+          acc += (buckets[i].count / total) * 100;
           if (pct <= acc) {
-            showChartDetail(details, b);
+            selectBucket(details, legend, legend.children[i], buckets[i]);
             break;
           }
         }

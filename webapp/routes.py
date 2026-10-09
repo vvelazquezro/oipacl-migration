@@ -28,6 +28,8 @@ def _creds_from_form(form):
 def _load_credentials_state():
     g.creds = current_app.cred_store.get(session.get("cred_id"))
     g.has_credentials = g.creds is not None
+    g.has_account_key = bool((g.creds or {}).get("account_switch_key"))
+    g.is_ready = g.has_credentials and g.has_account_key
 
 
 @bp.context_processor
@@ -35,6 +37,8 @@ def _inject_credentials_state():
     account_switch_key = (getattr(g, "creds", None) or {}).get("account_switch_key", "")
     return {
         "has_credentials": getattr(g, "has_credentials", False),
+        "has_account_key": getattr(g, "has_account_key", False),
+        "is_ready": getattr(g, "is_ready", False),
         "creds_form": CredentialsForm(),
         "account_key_form": AccountSwitchKeyForm(account_switch_key=account_switch_key),
     }
@@ -77,6 +81,8 @@ def index():
 
 @bp.route("/audit", methods=["GET", "POST"])
 def audit():
+    if not g.is_ready:
+        return redirect(url_for("main.index"))
     form = AuditForm()
     if form.validate_on_submit():
         creds = current_app.cred_store.get(session.get("cred_id"))
@@ -101,6 +107,8 @@ def audit():
 
 @bp.route("/migrate", methods=["GET", "POST"])
 def migrate():
+    if not g.is_ready:
+        return redirect(url_for("main.index"))
     form = MigrateForm()
     if form.validate_on_submit():
         creds = current_app.cred_store.get(session.get("cred_id"))
@@ -120,6 +128,8 @@ def migrate():
                     {
                         "names": names, "version": form.environment.data,
                         "account_key": creds.get("account_switch_key", ""), "notes": form.notes.data or "SiteShield Migration to OIPACL",
+                        "enable_td": form.enable_tiered_distribution.data,
+                        "add_oipacl_without_ss": form.add_oipacl_without_siteshield.data,
                         "activate_option": form.activate_option.data,
                         "notify_email": form.notify_email.data.strip() if form.notify_email.data else "",
                         "peer_reviewer_email": (form.peer_reviewer_email.data or "").strip(),
@@ -131,6 +141,8 @@ def migrate():
 
 @bp.route("/activate", methods=["GET", "POST"])
 def activate():
+    if not g.is_ready:
+        return redirect(url_for("main.index"))
     form = ActivateForm()
     if form.validate_on_submit():
         creds = current_app.cred_store.get(session.get("cred_id"))

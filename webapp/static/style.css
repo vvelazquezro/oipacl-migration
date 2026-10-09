@@ -111,6 +111,7 @@ header h1 a { text-decoration: none; color: inherit; }
 .pill { padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
 .pill-ok { background: var(--color-success-bg); color: var(--color-success-text); }
 .pill-warn { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.pill-info { background: var(--color-tint-bg); color: var(--color-tint-text); }
 
 .link-button {
   background: none; border: none; color: var(--color-primary); padding: 0; cursor: pointer;
@@ -126,6 +127,8 @@ header h1 a { text-decoration: none; color: inherit; }
   box-shadow: var(--shadow-card); transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
 }
 .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); border-color: var(--color-tint-border); }
+.card-disabled { cursor: not-allowed; opacity: 0.55; }
+.card-disabled:hover { transform: none; box-shadow: var(--shadow-card); border-color: var(--color-border); }
 .card-badge {
   display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem;
   border-radius: var(--radius-md); background: var(--color-tint-bg); color: var(--color-primary);
@@ -158,6 +161,9 @@ header h1 a { text-decoration: none; color: inherit; }
 .field input[type=file]:hover::-webkit-file-upload-button {
   background: #F8FAFC; border-color: #CBD5E1;
 }
+.field-checkbox { display: flex; flex-direction: row-reverse; align-items: center; justify-content: flex-end; gap: 0.5rem; }
+.field-checkbox label { display: inline; margin-bottom: 0; }
+.field-checkbox input[type=checkbox] { width: 1.1rem; height: 1.1rem; accent-color: var(--color-primary); }
 .errors { color: var(--color-danger-text); margin: 0.3rem 0 0; padding-left: 1.2rem; font-size: 0.85rem; }
 .field-error { color: var(--color-danger-text); font-size: 0.85rem; margin-top: 0.3rem; }
 
@@ -222,12 +228,19 @@ progress#progress-bar::-moz-progress-bar { background: var(--color-primary); bor
   color: var(--color-text-muted); transition: color var(--transition-base);
 }
 .chart-legend li:hover { color: var(--color-primary); }
+.chart-legend li.active { color: var(--color-primary); font-weight: 700; }
 .legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
 .chart-detail {
-  margin-top: 0.85rem; font-size: 0.82rem; color: var(--color-text-muted); min-height: 1.2em;
+  position: relative; margin-top: 0.85rem; font-size: 0.82rem; color: var(--color-text-muted); min-height: 1.2em;
   white-space: pre-line;
 }
 .chart-detail strong { color: var(--color-text); }
+.chart-detail-clear {
+  position: absolute; top: -0.2rem; right: 0; width: 1.3rem; height: 1.3rem; line-height: 1;
+  border: none; border-radius: 50%; background: var(--color-border); color: var(--color-text);
+  cursor: pointer; font-size: 0.95rem;
+}
+.chart-detail-clear:hover { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
 .downloads { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; align-items: flex-start; }
 .download-link {

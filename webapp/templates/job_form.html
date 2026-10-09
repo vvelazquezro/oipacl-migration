@@ -5,7 +5,7 @@
 <form method="post" enctype="multipart/form-data" novalidate>
   {{ form.csrf_token }}
   {% for field in form if field.name != "csrf_token" %}
-    <div class="field">
+    <div class="field{{ ' field-checkbox' if field.type == 'BooleanField' else '' }}">
       {{ field.label }}
       {{ field() }}
       {% if field.errors %}

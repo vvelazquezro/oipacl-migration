@@ -50,7 +50,7 @@ The app listens on plain HTTP port `8080` and must be reachable under `APP_ROOT_
 
 ## Using the App
 
-1. On first visit, a **Connect to Akamai** dialog pops up asking for your EdgeGrid credentials (host, client token, client secret, access token) and account switch key. Submit once per browser session — a header pill shows "Credentials connected" afterward, with **Change credentials** / **Disconnect** actions available any time.
+1. On first visit, a **Connect to Akamai** dialog pops up asking for your EdgeGrid credentials (host, client token, client secret, access token) and account switch key. Submit once per browser session — a header pill shows "Ready to use" once both credentials and an account switch key are set, with **Change credentials** / **Disconnect** actions available any time. Audit, Migrate, and Activate are unavailable until the pill reads "Ready to use".
 2. Choose **Audit**, **Migrate**, or **Activate**.
 3. Provide the property list, either by uploading a CSV (first column, header row ignored) or pasting names/hostnames (one per line). Activation expects `name,version` rows instead.
 4. Submit. You'll be redirected to a job page showing a progress bar and a friendly status message as properties are processed.

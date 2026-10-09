@@ -28,8 +28,8 @@ def has_oipacl(json_tree) -> bool:
     return has_behavior(json_tree, "originIpAcl")
 
 
-def replace_siteShield(tree):
-    """Replace "siteShield" nodes with "originIpAcl" and "tieredDistribution"."""
+def replace_siteShield(tree, enable_td: bool = True):
+    """Replace "siteShield" nodes with "originIpAcl", optionally adding/enabling "tieredDistribution"."""
     origin_acl = {"name": "originIpAcl", "options": {"enable": True}}
     tiered = {"name": "tieredDistribution", "options": {"enabled": True}}
 
@@ -39,15 +39,20 @@ def replace_siteShield(tree):
             for i in node:
                 if isinstance(i, dict) and i.get("name") == "siteShield":
                     new_lst.append(origin_acl)
-                    if not td_seen:
+                    if enable_td and not td_seen:
                         new_lst.append(tiered)
                         td_seen = True
                     continue
                 if isinstance(i, dict) and i.get("name") == "tieredDistribution":
-                    i.setdefault("options", {})["enabled"] = True
-                    new_i, td_seen = _rep(i, True)
-                    new_lst.append(new_i)
-                    td_seen = True
+                    if enable_td:
+                        i.setdefault("options", {})["enabled"] = True
+                        new_i, td_seen = _rep(i, True)
+                        new_lst.append(new_i)
+                        td_seen = True
+                    else:
+                        # Toggle is off: leave any existing tieredDistribution node untouched.
+                        new_i, td_seen = _rep(i, td_seen)
+                        new_lst.append(new_i)
                     continue
                 new_i, td_seen = _rep(i, td_seen)
                 new_lst.append(new_i)

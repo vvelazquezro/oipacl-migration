@@ -1,7 +1,7 @@
 from email_validator import EmailNotValidError, validate_email
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField
-from wtforms import PasswordField, SelectField, StringField, TextAreaField
+from wtforms import BooleanField, PasswordField, SelectField, StringField, TextAreaField
 from wtforms.validators import DataRequired, Email, Length, Optional, Regexp, ValidationError
 
 _ACCOUNT_KEY_RE = r"^[A-Za-z0-9:\-_]{1,64}$"
@@ -49,6 +49,12 @@ class _NotifyEmailMixin:
 
 class MigrateForm(PropertyListForm, _NotifyEmailMixin):
     notes = StringField("Notes", default="SiteShield Migration to OIPACL", validators=[Optional(), Length(max=500)])
+    enable_tiered_distribution = BooleanField(
+        "Enable Tiered Distribution (second layer of caching)", default=True, validators=[Optional()],
+    )
+    add_oipacl_without_siteshield = BooleanField(
+        "Still add OriginIpAcl when SiteShield is not present", default=True, validators=[Optional()],
+    )
     activate_option = SelectField(
         "Activate after migration",
         choices=[
