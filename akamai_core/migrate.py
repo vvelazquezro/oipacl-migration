@@ -8,13 +8,15 @@ from .transforms import has_oipacl, has_ss, replace_siteShield, update_sureRoute
 
 ACTIVATE_HEADERS = ["Configuration name", "Configuration version"]
 ERROR_HEADERS = ["Configuration name", "Configuration version", "Error Detail"]
+SKIPPED_HEADERS = ["Configuration name", "Configuration version", "Reason"]
 
 
 def migrate_properties(client: PapiClient, names: list[str], env_target: str, account_key: str,
                         notes: str, logger: logging.Logger, on_progress=None, enable_td: bool = True,
                         add_oipacl_without_ss: bool = True) -> dict:
-    """Evaluates and migrates each property. Returns {"to_activate": [...], "errors": [...]} rows."""
+    """Evaluates and migrates each property. Returns {"to_activate": [...], "skipped": [...], "errors": [...]} rows."""
     to_activate = []
+    skipped = []
     errors = []
     total = len(names)
 
@@ -45,7 +47,7 @@ def migrate_properties(client: PapiClient, names: list[str], env_target: str, ac
 
             if not (has_ss_flag or sr_changed or needs_oipacl_injection):
                 logger.info("No changes required for %s.", name)
-                errors.append([name, version_info["propertyVersion"], "No changes required"])
+                skipped.append([name, version_info["propertyVersion"], "No changes required"])
                 continue
 
             if has_ss_flag:
@@ -82,4 +84,4 @@ def migrate_properties(client: PapiClient, names: list[str], env_target: str, ac
             logger.error("Error migrating %s: %s", name, e)
             errors.append([name, "N/A", str(e)])
 
-    return {"to_activate": to_activate, "errors": errors}
+    return {"to_activate": to_activate, "skipped": skipped, "errors": errors}

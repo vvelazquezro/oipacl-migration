@@ -44,6 +44,7 @@
         {% if has_credentials %}
           <button type="button" id="open-creds-btn" class="link-button">Change credentials</button>
           <form method="post" action="{{ url_for('main.clear_credentials') }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="link-button">Disconnect</button>
           </form>
         {% else %}

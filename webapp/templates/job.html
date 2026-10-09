@@ -15,9 +15,12 @@
 {% endif %}
 <div id="downloads" class="downloads"></div>
 {% if job.action == "audit" %}
-<div id="audit-next-actions" class="audit-next-actions hidden">
+<div id="audit-next-actions" class="next-actions hidden">
   <a id="migrate-from-audit-btn" href="{{ url_for('main.migrate') }}" class="btn btn-secondary">Migrate these properties &rarr;</a>
 </div>
+{% endif %}
+{% if job.action == "migrate" %}
+<div id="migrate-next-actions" class="next-actions hidden"></div>
 {% endif %}
 
 <button type="button" id="toggle-advanced" class="link-button">Open execution logs</button>
@@ -117,6 +120,48 @@
           sessionStorage.setItem("ssmigrator:source-audit-job", "{{ job.id }}");
           window.location.href = migrateBtn.href;
         });
+      }
+
+      if ("{{ job.action }}" === "migrate") {
+        const migratedFile = "properties_migrated.csv";
+        const migratedCount = (data.summary && data.summary.migrated) || 0;
+        const hasMigratedFile = migratedCount > 0 && (fd.files || []).includes(migratedFile);
+        const pendingNetworks = fd.pending_networks || [];
+        const networkLabels = { staging: "Staging", production: "Production" };
+
+        const fetchMigratedRows = () =>
+          fetch(downloadBase + encodeURIComponent(migratedFile))
+            .then((r) => r.text())
+            .then((text) => text.trim().split("\n").slice(1).filter(Boolean)
+              .map((line) => line.split(",").slice(0, 2).map((c) => c.trim()).join(",")));
+
+        if (hasMigratedFile && fd.activate_option === "both") {
+          // Already pushed to both networks: force the download so the record isn't missed, skip the prompt.
+          const a = document.createElement("a");
+          a.href = downloadBase + encodeURIComponent(migratedFile);
+          a.download = migratedFile;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } else if (hasMigratedFile && pendingNetworks.length) {
+          const wrap = document.getElementById("migrate-next-actions");
+          pendingNetworks.forEach((network) => {
+            const btn = document.createElement("a");
+            btn.href = "{{ url_for('main.activate') }}";
+            btn.className = "btn btn-secondary";
+            btn.textContent = `Activate to ${networkLabels[network]} \u2192`;
+            btn.addEventListener("click", (e) => {
+              e.preventDefault();
+              fetchMigratedRows().then((rows) => {
+                sessionStorage.setItem("ssmigrator:prefill-activation", rows.join("\n"));
+                sessionStorage.setItem("ssmigrator:prefill-activation-network", network);
+                window.location.href = btn.href;
+              });
+            });
+            wrap.appendChild(btn);
+          });
+          wrap.classList.remove("hidden");
+        }
       }
     });
   });

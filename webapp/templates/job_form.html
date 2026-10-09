@@ -50,6 +50,19 @@
 {% if action == "activate" %}
 <script>
   (function () {
+    const rowsKey = "ssmigrator:prefill-activation";
+    const networkKey = "ssmigrator:prefill-activation-network";
+    const prefillRows = sessionStorage.getItem(rowsKey);
+    const prefillNetwork = sessionStorage.getItem(networkKey);
+    sessionStorage.removeItem(rowsKey);
+    sessionStorage.removeItem(networkKey);
+    const textArea = document.getElementById("activation_text");
+    if (prefillRows && textArea && !textArea.value.trim()) textArea.value = prefillRows;
+    const envSelect = document.getElementById("environment");
+    if (prefillNetwork && envSelect) envSelect.value = prefillNetwork;
+  })();
+
+  (function () {
     const fileInput = document.getElementById("activation_file");
     const textArea = document.getElementById("activation_text");
     const form = textArea.closest("form");

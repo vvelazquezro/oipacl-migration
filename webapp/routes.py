@@ -199,6 +199,8 @@ def job_files(job_id):
         "status": job.status, "error": job.error,
         "files": sorted((job.files or {}).keys()), "charts": job.charts,
         "names": job.names or [],
+        "activate_option": job.activate_option,
+        "pending_networks": job.pending_networks or [],
     })
 
 

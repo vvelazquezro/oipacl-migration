@@ -250,7 +250,7 @@ progress#progress-bar::-moz-progress-bar { background: var(--color-primary); bor
 }
 .download-link:hover { transform: translateY(-1px); border-color: var(--color-tint-border); background: var(--color-tint-bg); }
 
-.audit-next-actions { display: flex; justify-content: flex-end; margin: -0.5rem 0 1.25rem; }
+.next-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.6rem; margin: -0.5rem 0 1.25rem; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

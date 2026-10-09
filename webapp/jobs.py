@@ -20,7 +20,12 @@ from akamai_core.activate import activate_properties
 from akamai_core.audit import AUDIT_HEADERS, audit_properties
 from akamai_core.auth import build_client
 from akamai_core.errors import PapiRequestError
-from akamai_core.migrate import ACTIVATE_HEADERS, ERROR_HEADERS as MIGRATE_ERROR_HEADERS, migrate_properties
+from akamai_core.migrate import (
+    ACTIVATE_HEADERS,
+    ERROR_HEADERS as MIGRATE_ERROR_HEADERS,
+    SKIPPED_HEADERS as MIGRATE_SKIPPED_HEADERS,
+    migrate_properties,
+)
 
 _SENTINEL = object()
 _JOB_TTL_SECONDS = 3600  # jobs (and their credentials-free results) are dropped after this
@@ -36,6 +41,8 @@ class Job:
     summary: dict | None = None  # friendly counts shown on completion
     charts: dict | None = None  # {chart_key: [{"label":, "count":, "names": [...]}]} for audit/migrate jobs
     names: list | None = None  # original property list, for audit jobs, so Migrate can be prefilled
+    activate_option: str | None = None  # migrate jobs only: "none" | "staging" | "production" | "both"
+    pending_networks: list | None = None  # migrate jobs only: networks not yet activated, so Activate can be prefilled
     created_at: float = field(default_factory=time.time)
     log_queue: "queue.Queue" = field(default_factory=queue.Queue)
     log_lines: list = field(default_factory=list)  # full log, retained so it can be downloaded after the job ends
@@ -85,12 +92,13 @@ def build_audit_charts(rows: list[list]) -> dict:
     }
 
 
-def build_migrate_charts(to_activate: list[list], errors: list[list],
+def build_migrate_charts(to_activate: list[list], skipped: list[list], errors: list[list],
                           activation_succeeded: list[list] | None = None, activation_errors: list[list] | None = None) -> dict:
     charts = {
         "migration": [
             {"label": "Migrated", "count": len(to_activate), "names": [r[0] for r in to_activate]},
-            {"label": "Skipped / Failed", "count": len(errors), "names": [r[0] for r in errors]},
+            {"label": "Skipped", "count": len(skipped), "names": [r[0] for r in skipped]},
+            {"label": "Failed", "count": len(errors), "names": [r[0] for r in errors]},
         ],
     }
     if activation_succeeded is not None or activation_errors is not None:
@@ -152,6 +160,7 @@ class JobManager:
                                                  enable_td=params.get("enable_td", True),
                                                  add_oipacl_without_ss=params.get("add_oipacl_without_ss", True))
                     to_activate = result["to_activate"]
+                    skipped = result["skipped"]
                     errors = result["errors"]
 
                     activate_option = params.get("activate_option", "none")
@@ -169,28 +178,33 @@ class JobManager:
                             activation_succeeded.extend([n, v, network] for n, v in act_result["succeeded"])
                             activation_errors.extend([n, v, network, reason] for n, v, reason in act_result["errors"])
 
-                    job.files = {}
+                    job.files = {"properties_migrated.csv": (ACTIVATE_HEADERS, to_activate)}
+                    if skipped:
+                        job.files["migration_skipped.csv"] = (MIGRATE_SKIPPED_HEADERS, skipped)
                     if errors:
                         job.files["migration_errors.csv"] = (MIGRATE_ERROR_HEADERS, errors)
-                    if activate_option == "none":
-                        # Only surface the "still needs activation" list when nothing was auto-deployed above.
-                        job.files["properties_to_activate.csv"] = (ACTIVATE_HEADERS, to_activate)
                     if activation_succeeded or activation_errors:
                         combined = [[n, v, net, "Success"] for n, v, net in activation_succeeded] + \
                                    [[n, v, net, reason] for n, v, net, reason in activation_errors]
                         job.files["activation_results.csv"] = (
                             ["Configuration name", "Configuration version", "Network", "Status"], combined)
 
-                    job.summary = {"migrated": len(to_activate), "skipped_or_failed": len(errors)}
+                    job.summary = {"migrated": len(to_activate), "skipped": len(skipped), "failed": len(errors)}
                     if activate_option != "none":
                         job.summary["activated"] = len(activation_succeeded)
                         job.summary["activation_failed"] = len(activation_errors)
 
                     job.charts = build_migrate_charts(
-                        to_activate, errors,
+                        to_activate, skipped, errors,
                         activation_succeeded if activate_option != "none" else None,
                         activation_errors if activate_option != "none" else None,
                     )
+
+                    job.activate_option = activate_option
+                    activated_networks = {
+                        "none": [], "staging": ["staging"], "production": ["production"], "both": ["staging", "production"],
+                    }[activate_option]
+                    job.pending_networks = [n for n in ("staging", "production") if n not in activated_networks] if to_activate else []
 
                 elif job.action == "activate":
                     result = activate_properties(client, params["rows"], params["version"], params["account_key"],
