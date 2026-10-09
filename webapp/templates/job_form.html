@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} - Akamai SiteShield Migration Tool{% endblock %}
+{% block content %}
+<h2>{{ title }}</h2>
+<form method="post" enctype="multipart/form-data" novalidate>
+  {{ form.csrf_token }}
+  {% for field in form if field.name != "csrf_token" %}
+    <div class="field">
+      {{ field.label }}
+      {{ field() }}
+      {% if field.errors %}
+        <ul class="errors">
+          {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">Start {{ action | capitalize }}</button>
+</form>
+
+{% if action == "migrate" %}
+<script>
+  (function () {
+    const key = "ssmigrator:prefill-properties";
+    const prefill = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    if (!prefill) return;
+    const textArea = document.getElementById("properties_text");
+    if (textArea && !textArea.value.trim()) textArea.value = prefill;
+  })();
+
+  (function () {
+    const activateSelect = document.getElementById("activate_option");
+    const notifyField = document.getElementById("notify_email");
+    const peerField = document.getElementById("peer_reviewer_email");
+    if (!activateSelect || !notifyField || !peerField) return;
+    const notifyWrap = notifyField.closest(".field");
+    const peerWrap = peerField.closest(".field");
+
+    function updateVisibility() {
+      const val = activateSelect.value;
+      notifyWrap.classList.toggle("hidden", val === "none");
+      peerWrap.classList.toggle("hidden", val !== "production" && val !== "both");
+    }
+    activateSelect.addEventListener("change", updateVisibility);
+    updateVisibility();
+  })();
+</script>
+{% endif %}
+{% if action == "activate" %}
+<script>
+  (function () {
+    const fileInput = document.getElementById("activation_file");
+    const textArea = document.getElementById("activation_text");
+    const form = textArea.closest("form");
+    const field = textArea.closest(".field");
+    const errorEl = document.createElement("div");
+    errorEl.className = "field-error";
+    field.appendChild(errorEl);
+
+    form.addEventListener("submit", (e) => {
+      errorEl.textContent = "";
+      const hasFile = fileInput.files && fileInput.files.length > 0;
+      const lines = textArea.value.split("\n").map((l) => l.trim()).filter(Boolean);
+      const hasValidRow = lines.some((line) => {
+        const parts = line.split(",").map((p) => p.trim());
+        return parts.length >= 2 && parts[0] && parts[1];
+      });
+      if (!hasFile && !hasValidRow) {
+        e.preventDefault();
+        errorEl.textContent = "Provide at least one 'name,version' row (upload a CSV or paste rows below).";
+        textArea.focus();
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}
+

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id }} - Akamai SiteShield Migration Tool{% endblock %}
+{% block content %}
+<h2>{{ job.action | capitalize }}</h2>
+
+<div class="progress-wrap">
+  <progress id="progress-bar" max="100" value="0"></progress>
+  <span id="progress-count"></span>
+</div>
+<p id="status-message">Starting…</p>
+
+<div id="summary" class="summary hidden"></div>
+{% if job.action in ("audit", "migrate") %}
+<div id="charts" class="charts-grid hidden"></div>
+{% endif %}
+<div id="downloads" class="downloads"></div>
+{% if job.action == "audit" %}
+<div id="audit-next-actions" class="audit-next-actions hidden">
+  <a id="migrate-from-audit-btn" href="{{ url_for('main.migrate') }}" class="btn btn-secondary">Migrate these properties &rarr;</a>
+</div>
+{% endif %}
+
+<button type="button" id="toggle-advanced" class="link-button">Open execution logs</button>
+<pre id="log" class="hidden"></pre>
+
+<script>
+  const streamUrl = "{{ url_for('main.job_stream', job_id=job.id) }}";
+  const filesUrl = "{{ url_for('main.job_files', job_id=job.id) }}";
+  const logEl = document.getElementById("log");
+  const progressBar = document.getElementById("progress-bar");
+  const progressCount = document.getElementById("progress-count");
+  const statusMessage = document.getElementById("status-message");
+  const summaryEl = document.getElementById("summary");
+  const downloadsEl = document.getElementById("downloads");
+  const downloadBase = "{{ url_for('main.job_view', job_id=job.id) }}" + "/download/";
+  const toggleBtn = document.getElementById("toggle-advanced");
+
+  toggleBtn.addEventListener("click", () => {
+    const nowHidden = logEl.classList.toggle("hidden");
+    toggleBtn.textContent = nowHidden ? "Open execution logs" : "Hide execution logs";
+  });
+
+  const source = new EventSource(streamUrl);
+
+  source.onmessage = (e) => {
+    logEl.textContent += e.data + "\n";
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  source.addEventListener("progress", (e) => {
+    const data = JSON.parse(e.data);
+    const pct = data.total ? Math.round((data.current / data.total) * 100) : 0;
+    progressBar.value = pct;
+    progressCount.textContent = data.total ? `${data.current} / ${data.total}` : "";
+    statusMessage.textContent = data.name ? `Processing ${data.name}…` : "Working…";
+  });
+
+  source.addEventListener("done", (e) => {
+    const data = JSON.parse(e.data);
+    source.close();
+    progressBar.value = 100;
+
+    if (data.status === "error") {
+      statusMessage.textContent = "Something went wrong" + (data.error ? ": " + data.error : ".") + " Check advanced mode for details.";
+    } else {
+      statusMessage.textContent = "Done!";
+    }
+
+    if (data.summary) {
+      summaryEl.classList.remove("hidden");
+      summaryEl.innerHTML = Object.entries(data.summary)
+        .map(([k, v]) => `<span class="summary-pill">${k.replace(/_/g, " ")}: <strong>${v}</strong></span>`)
+        .join("");
+    }
+
+    fetch(filesUrl).then((r) => r.json()).then((fd) => {
+      (fd.files || []).forEach((filename) => {
+        const link = document.createElement("a");
+        link.href = downloadBase + encodeURIComponent(filename);
+        link.textContent = "Download " + filename;
+        link.className = "download-link";
+        downloadsEl.appendChild(link);
+      });
+
+      const logLink = document.createElement("a");
+      logLink.href = "{{ url_for('main.job_view', job_id=job.id) }}" + "/log";
+      logLink.textContent = "Download logs";
+      logLink.className = "download-link";
+      downloadsEl.appendChild(logLink);
+
+      renderCharts(fd.charts);
+
+      const migrateBtn = document.getElementById("migrate-from-audit-btn");
+      if (migrateBtn && (fd.names || []).length) {
+        document.getElementById("audit-next-actions").classList.remove("hidden");
+        migrateBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          sessionStorage.setItem("ssmigrator:prefill-properties", fd.names.join("\n"));
+          window.location.href = migrateBtn.href;
+        });
+      }
+    });
+  });
+
+  const CHART_TITLES = {
+    sureroute: "SureRoute Status", siteshield: "SiteShield", tiered_distribution: "Tiered Distribution",
+    migration: "Migration Results", activation: "Activation Results",
+  };
+  const PASTEL_COLORS = ["#AEE1F9", "#FFD6A5", "#CAFFBF", "#FFADAD", "#BDB2FF", "#FFC6FF", "#9BF6FF", "#FDFFB6"];
+
+  function showChartDetail(el, bucket) {
+    el.innerHTML = `<strong>${bucket.label}</strong> (${bucket.count}):\n${bucket.names.join("\n")}`;
+  }
+
+  function renderCharts(charts) {
+    const chartsEl = document.getElementById("charts");
+    if (!chartsEl || !charts) return;
+
+    Object.entries(charts).forEach(([key, buckets]) => {
+      const total = (buckets || []).reduce((sum, b) => sum + b.count, 0);
+      if (!total) return;
+
+      const card = document.createElement("div");
+      card.className = "chart-card";
+
+      const heading = document.createElement("h3");
+      heading.textContent = CHART_TITLES[key] || key;
+      card.appendChild(heading);
+
+      const body = document.createElement("div");
+      body.className = "chart-body";
+
+      const pie = document.createElement("div");
+      pie.className = "pie-chart";
+      pie.title = "Click a slice for details";
+
+      let cursor = 0;
+      const stops = buckets.map((b, i) => {
+        const start = cursor;
+        cursor += (b.count / total) * 100;
+        return `${PASTEL_COLORS[i % PASTEL_COLORS.length]} ${start}% ${cursor}%`;
+      });
+      pie.style.background = `conic-gradient(${stops.join(", ")})`;
+
+      const hole = document.createElement("div");
+      hole.className = "pie-chart-hole";
+      pie.appendChild(hole);
+
+      const legend = document.createElement("ul");
+      legend.className = "chart-legend";
+
+      const details = document.createElement("div");
+      details.className = "chart-detail";
+
+      buckets.forEach((b, i) => {
+        const li = document.createElement("li");
+        const swatch = document.createElement("span");
+        swatch.className = "legend-swatch";
+        swatch.style.background = PASTEL_COLORS[i % PASTEL_COLORS.length];
+        li.appendChild(swatch);
+        li.appendChild(document.createTextNode(`${b.label} (${b.count})`));
+        li.addEventListener("click", () => showChartDetail(details, b));
+        legend.appendChild(li);
+      });
+
+      pie.addEventListener("click", (e) => {
+        const rect = pie.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) + 90;
+        if (angle < 0) angle += 360;
+        const pct = (angle / 360) * 100;
+        let acc = 0;
+        for (const b of buckets) {
+          acc += (b.count / total) * 100;
+          if (pct <= acc) {
+            showChartDetail(details, b);
+            break;
+          }
+        }
+      });
+
+      body.appendChild(pie);
+      body.appendChild(legend);
+      card.appendChild(body);
+      card.appendChild(details);
+      chartsEl.appendChild(card);
+    });
+
+    if (chartsEl.children.length) {
+      chartsEl.classList.remove("hidden");
+    }
+  }
+</script>
+{% endblock %}

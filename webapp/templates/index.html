@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<p>Choose an operation. Credentials are used only for this request and are never stored.</p>
+<div class="card-grid">
+  <a class="card" href="{{ url_for('main.audit') }}">
+    <span class="card-badge">A</span>
+    <h2>Audit</h2>
+    <p>Scan properties and report compliance status (OIPACL, Tiered Distribution, SiteShield, SureRoute).</p>
+  </a>
+  <a class="card" href="{{ url_for('main.migrate') }}">
+    <span class="card-badge">M</span>
+    <h2>Migrate</h2>
+    <p>Replace SiteShield with Origin IP ACL + Tiered Distribution, and change SureRoute map.</p>
+  </a>
+  <a class="card" href="{{ url_for('main.activate') }}">
+    <span class="card-badge">Ac</span>
+    <h2>Activate</h2>
+    <p>Activate migrated property versions to staging or production.</p>
+  </a>
+</div>
+{% endblock %}

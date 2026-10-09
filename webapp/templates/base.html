@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Akamai SiteShield Migration Tool{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="bg-dots" aria-hidden="true">
+    <span class="dot" style="top:8%;  left:12%; width:10px; height:10px; background:rgba(var(--color-primary-rgb),0.30);   --dx:50px;  --dy:-35px; animation-duration:19s; animation-delay:0s;"></span>
+    <span class="dot" style="top:18%; left:78%; width:7px;  height:7px;  background:rgba(var(--color-secondary-rgb),0.35); --dx:-40px; --dy:30px;  animation-duration:23s; animation-delay:1.5s;"></span>
+    <span class="dot" style="top:32%; left:45%; width:5px;  height:5px;  background:rgba(var(--color-primary-rgb),0.25);   --dx:35px;  --dy:45px;  animation-duration:17s; animation-delay:3s;"></span>
+    <span class="dot" style="top:44%; left:6%;  width:9px;  height:9px;  background:rgba(var(--color-secondary-rgb),0.28); --dx:45px;  --dy:-25px; animation-duration:25s; animation-delay:0.5s;"></span>
+    <span class="dot" style="top:58%; left:88%; width:8px;  height:8px;  background:rgba(var(--color-primary-rgb),0.32);   --dx:-30px; --dy:-40px; animation-duration:21s; animation-delay:4s;"></span>
+    <span class="dot" style="top:68%; left:30%; width:6px;  height:6px;  background:rgba(var(--color-secondary-rgb),0.30); --dx:40px;  --dy:35px;  animation-duration:18s; animation-delay:2s;"></span>
+    <span class="dot" style="top:78%; left:65%; width:11px; height:11px; background:rgba(var(--color-primary-rgb),0.22);   --dx:-45px; --dy:30px;  animation-duration:26s; animation-delay:5s;"></span>
+    <span class="dot" style="top:88%; left:15%; width:7px;  height:7px;  background:rgba(var(--color-secondary-rgb),0.32); --dx:30px;  --dy:-45px; animation-duration:20s; animation-delay:1s;"></span>
+    <span class="dot" style="top:5%;  left:55%; width:6px;  height:6px;  background:rgba(var(--color-primary-rgb),0.28);   --dx:-35px; --dy:40px;  animation-duration:22s; animation-delay:2.5s;"></span>
+    <span class="dot" style="top:95%; left:48%; width:8px;  height:8px;  background:rgba(var(--color-secondary-rgb),0.26); --dx:40px;  --dy:-30px; animation-duration:24s; animation-delay:3.5s;"></span>
+  </div>
+  <header>
+    <h1><a href="{{ url_for('main.index') }}">Akamai <span class="text-accent">SiteShield</span> Migration Tool</a></h1>
+    <div class="header-controls">
+      {% if has_credentials %}
+        <form id="account-key-form" class="account-key-widget" method="post" action="{{ url_for('main.update_account_key') }}" autocomplete="off">
+          {{ account_key_form.csrf_token }}
+          <label for="account_switch_key" class="sr-only">Account Switch Key</label>
+          <div class="account-key-input-wrap">
+            {{ account_key_form.account_switch_key(id="account_switch_key", placeholder="Account Switch Key (optional)") }}
+            <span id="account-key-check" class="account-key-check" aria-hidden="true"></span>
+          </div>
+          <div class="field-error" id="account-key-error"></div>
+        </form>
+      {% endif %}
+      <div class="creds-status">
+        {% if has_credentials %}
+          <span class="pill pill-ok">Credentials connected</span>
+          <button type="button" id="open-creds-btn" class="link-button">Change credentials</button>
+          <form method="post" action="{{ url_for('main.clear_credentials') }}" class="inline-form">
+            <button type="submit" class="link-button">Disconnect</button>
+          </form>
+        {% else %}
+          <span class="pill pill-warn">Credentials required</span>
+          <button type="button" id="open-creds-btn" class="link-button">Enter credentials</button>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+  <main>
+    {% if request.endpoint != "main.index" %}
+      <a href="{{ url_for('main.index') }}" class="back-link">&larr; Back</a>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <dialog id="creds-modal">
+    <form id="creds-form" method="post" action="{{ url_for('main.save_credentials') }}">
+      <h2>Connect to Akamai</h2>
+      <p>Used only for this browser session; never written to disk beyond a short-lived, in-memory reference.</p>
+      {{ creds_form.csrf_token }}
+      <div class="field">
+        <label for="edgerc-upload">Upload .edgerc file</label>
+        <input type="file" id="edgerc-upload" accept=".edgerc,text/plain">
+        <div class="field-error" id="edgerc-upload-error"></div>
+      </div>
+      <div class="divider"><span>or enter manually</span></div>
+      {% for field in creds_form if field.name != "csrf_token" %}
+        <div class="field">
+          {{ field.label }}
+          {{ field() }}
+          <div class="field-error" data-field="{{ field.name }}"></div>
+        </div>
+      {% endfor %}
+      <div class="dialog-actions">
+        <button type="submit" class="btn btn-primary">Connect</button>
+        {% if has_credentials %}<button type="button" id="close-creds-btn" class="btn btn-secondary">Cancel</button>{% endif %}
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    (function () {
+      const dialog = document.getElementById("creds-modal");
+      const openBtn = document.getElementById("open-creds-btn");
+      const closeBtn = document.getElementById("close-creds-btn");
+      const form = document.getElementById("creds-form");
+      const hasCredentials = {{ "true" if has_credentials else "false" }};
+
+      if (!hasCredentials) {
+        dialog.showModal();
+      }
+      if (openBtn) openBtn.addEventListener("click", () => dialog.showModal());
+      if (closeBtn) closeBtn.addEventListener("click", () => dialog.close());
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        document.querySelectorAll(".field-error").forEach((el) => (el.textContent = ""));
+        fetch(form.action, { method: "POST", body: new FormData(form) })
+          .then((r) => r.json().then((data) => ({ status: r.status, data })))
+          .then(({ status, data }) => {
+            if (status === 200 && data.ok) {
+              window.location.reload();
+            } else {
+              Object.entries(data.errors || {}).forEach(([field, msgs]) => {
+                const el = document.querySelector(`.field-error[data-field="${field}"]`);
+                if (el) el.textContent = msgs.join(" ");
+              });
+            }
+          });
+      });
+
+      // Parses a Netscape/Akamai .edgerc (INI-style) file client-side and autofills the form;
+      // the raw file is never uploaded to the server.
+      const edgercInput = document.getElementById("edgerc-upload");
+      const edgercError = document.getElementById("edgerc-upload-error");
+      const FIELD_IDS = ["host", "client_token", "client_secret", "access_token"];
+
+      function parseEdgercSection(text) {
+        const sections = {};
+        let current = null;
+        text.split(/\r?\n/).forEach((rawLine) => {
+          const line = rawLine.trim();
+          if (!line || line.startsWith("#") || line.startsWith(";")) return;
+          const sectionMatch = line.match(/^\[(.+)\]$/);
+          if (sectionMatch) {
+            current = sectionMatch[1].trim();
+            sections[current] = {};
+            return;
+          }
+          const kv = line.match(/^([^=]+)=(.*)$/);
+          if (kv && current) sections[current][kv[1].trim().toLowerCase()] = kv[2].trim();
+        });
+        return sections.default || sections[Object.keys(sections)[0]];
+      }
+
+      if (edgercInput) {
+        edgercInput.addEventListener("change", () => {
+          edgercError.textContent = "";
+          const file = edgercInput.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const section = parseEdgercSection(String(reader.result));
+            if (!section || !FIELD_IDS.some((id) => section[id])) {
+              edgercError.textContent = "Could not find credentials in this file.";
+              return;
+            }
+            FIELD_IDS.forEach((id) => {
+              if (section[id]) document.getElementById(id).value = section[id];
+            });
+          };
+          reader.onerror = () => (edgercError.textContent = "Could not read the selected file.");
+          reader.readAsText(file);
+        });
+      }
+
+      // Account switch key: typed manually. There is no Save button --
+      // leaving the field (blur) or pressing Enter auto-saves it.
+      const accountKeyForm = document.getElementById("account-key-form");
+      if (accountKeyForm) {
+        const input = document.getElementById("account_switch_key");
+        const checkEl = document.getElementById("account-key-check");
+        const errorEl = document.getElementById("account-key-error");
+        const csrfInput = accountKeyForm.querySelector('input[name="csrf_token"]');
+        let lastSavedValue = input.value.trim();
+
+        function setCheckState(state) {
+          checkEl.className = "account-key-check " + state;
+        }
+        if (lastSavedValue) setCheckState("valid");
+
+        function saveKey(value) {
+          if (value === lastSavedValue) return;
+          setCheckState("checking");
+          const formData = new FormData();
+          formData.append("csrf_token", csrfInput.value);
+          formData.append("account_switch_key", value);
+          fetch(accountKeyForm.action, { method: "POST", body: formData })
+            .then((r) => r.json().then((data) => ({ status: r.status, data })))
+            .then(({ status, data }) => {
+              if (status === 200 && data.ok) {
+                errorEl.textContent = "";
+                lastSavedValue = value;
+                setCheckState(value ? "valid" : "idle");
+              } else {
+                const msgs = (data.errors && data.errors.account_switch_key) || ["Could not save account switch key."];
+                errorEl.textContent = msgs.join(" ");
+                setCheckState("invalid");
+              }
+            })
+            .catch(() => {
+              errorEl.textContent = "Could not save account switch key.";
+              setCheckState("invalid");
+            });
+        }
+
+        input.addEventListener("input", () => {
+          errorEl.textContent = "";
+        });
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            saveKey(input.value.trim());
+          }
+        });
+
+        input.addEventListener("blur", () => saveKey(input.value.trim()));
+      }
+    })();
+  </script>
+</body>
+</html>
+
