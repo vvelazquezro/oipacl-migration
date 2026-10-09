@@ -15,7 +15,14 @@
       {% endif %}
     </div>
   {% endfor %}
-  <button type="submit" class="btn btn-primary">Start {{ action | capitalize }}</button>
+  <div class="form-actions">
+    {% if action == "migrate" %}
+      <a id="form-back-link" href="{{ url_for('main.index') }}" class="btn btn-secondary btn-back hidden">&larr; Back to Audit</a>
+    {% elif action == "activate" %}
+      <a id="form-back-link" href="{{ url_for('main.index') }}" class="btn btn-secondary btn-back hidden">&larr; Back to Migrate Results</a>
+    {% endif %}
+    <button type="submit" class="btn {{ 'btn-accent' if action == 'activate' else 'btn-primary' }}">Start {{ action | capitalize }}</button>
+  </div>
 </form>
 
 {% if action == "migrate" %}
@@ -30,36 +37,53 @@
   })();
 
   (function () {
-    const activateSelect = document.getElementById("activate_option");
-    const notifyField = document.getElementById("notify_email");
-    const peerField = document.getElementById("peer_reviewer_email");
-    if (!activateSelect || !notifyField || !peerField) return;
-    const notifyWrap = notifyField.closest(".field");
-    const peerWrap = peerField.closest(".field");
-
-    function updateVisibility() {
-      const val = activateSelect.value;
-      notifyWrap.classList.toggle("hidden", val === "none");
-      peerWrap.classList.toggle("hidden", val !== "production" && val !== "both");
-    }
-    activateSelect.addEventListener("change", updateVisibility);
-    updateVisibility();
+    const key = "ssmigrator:source-audit-job";
+    const auditJobId = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    if (!auditJobId) return;
+    const backLink = document.getElementById("form-back-link");
+    backLink.href = "{{ url_for('main.job_view', job_id='JOB_ID_PLACEHOLDER') }}".replace("JOB_ID_PLACEHOLDER", auditJobId);
+    backLink.classList.remove("hidden");
   })();
 </script>
 {% endif %}
 {% if action == "activate" %}
 <script>
   (function () {
+    const key = "ssmigrator:source-migrate-job";
+    const migrateJobId = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    if (!migrateJobId) return;
+    const backLink = document.getElementById("form-back-link");
+    backLink.href = "{{ url_for('main.job_view', job_id='JOB_ID_PLACEHOLDER') }}".replace("JOB_ID_PLACEHOLDER", migrateJobId);
+    backLink.classList.remove("hidden");
+  })();
+
+  (function () {
     const rowsKey = "ssmigrator:prefill-activation";
-    const networkKey = "ssmigrator:prefill-activation-network";
+    const networksKey = "ssmigrator:prefill-activation-networks";
     const prefillRows = sessionStorage.getItem(rowsKey);
-    const prefillNetwork = sessionStorage.getItem(networkKey);
+    const networksJson = sessionStorage.getItem(networksKey);
     sessionStorage.removeItem(rowsKey);
-    sessionStorage.removeItem(networkKey);
+    sessionStorage.removeItem(networksKey);
     const textArea = document.getElementById("activation_text");
     if (prefillRows && textArea && !textArea.value.trim()) textArea.value = prefillRows;
+
     const envSelect = document.getElementById("environment");
-    if (prefillNetwork && envSelect) envSelect.value = prefillNetwork;
+    let pendingNetworks = [];
+    try {
+      pendingNetworks = JSON.parse(networksJson || "[]");
+    } catch (e) {
+      pendingNetworks = [];
+    }
+    if (envSelect && pendingNetworks.length) {
+      // Only offer the network(s) still pending from the migration, so the already-activated one can't be picked again.
+      // "both" stays available regardless, since it's a valid choice whenever more than one network is pending.
+      Array.from(envSelect.options).forEach((opt) => {
+        if (opt.value !== "both" && !pendingNetworks.includes(opt.value)) opt.remove();
+      });
+      envSelect.value = pendingNetworks[0];
+    }
   })();
 
   (function () {

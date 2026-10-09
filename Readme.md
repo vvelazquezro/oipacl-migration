@@ -57,8 +57,8 @@ The app listens on plain HTTP port `8080` and must be reachable under `APP_ROOT_
 5. Toggle **Show advanced mode** to reveal the raw, terminal-style streaming log (useful for troubleshooting a specific property).
 6. When the job finishes, a summary (e.g. counts migrated/skipped/failed) and download link(s) for the result CSV appear:
    - **Audit** → `audit_results.csv` (Property Name, Version, OIPACL, Tiered Distribution, SiteShield, SureRoute Type)
-   - **Migrate** → `properties_migrated.csv` (always generated; successfully migrated versions), `migration_skipped.csv` (properties that needed no changes), and `migration_errors.csv` (actual failures with reasons). If the migration wasn't activated to both networks, an **Activate to Staging/Production →** button appears to carry the migrated list forward; if it was pushed to both, `properties_migrated.csv` downloads automatically instead.
-   - **Activate** → `activation_results.csv` (Configuration name, version, Status/error)
+   - **Migrate** → `migrated_properties_<accountKey>.csv` (always auto-downloaded; successfully migrated versions), `migration_skipped.csv` (properties that needed no changes), and `migration_errors.csv` (actual failures with reasons). Migrating never activates on its own — a **Proceed to Deploy →** button (next to **← Back to Migrate options**) carries the migrated list forward into the Activate form. A collapsible **Go to Properties** list also links each migrated property straight to its Control Center config page.
+   - **Activate** → `activation_results.csv` (Configuration name, version, Network, Status/error). Network can be Staging, Production, or Both; activating to Production or Both requires a Peer Reviewer email and a Pull Request link (appended to the activation comments).
 
 ---
 

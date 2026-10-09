@@ -14,23 +14,26 @@
 <div id="charts" class="charts-grid hidden"></div>
 {% endif %}
 <div id="downloads" class="downloads"></div>
+{% if job.action == "migrate" %}
+<details id="go-to-properties" class="go-to-properties hidden">
+  <summary>Go to Properties</summary>
+  <ul id="go-to-properties-list"></ul>
+</details>
+{% endif %}
 {% if job.action == "audit" %}
 <div id="audit-next-actions" class="next-actions hidden">
-  <a id="migrate-from-audit-btn" href="{{ url_for('main.migrate') }}" class="btn btn-secondary">Migrate these properties &rarr;</a>
+  <a id="migrate-from-audit-btn" href="{{ url_for('main.migrate') }}" class="btn btn-primary">Migrate these properties &rarr;</a>
 </div>
 {% endif %}
 {% if job.action == "migrate" %}
-<div id="migrate-next-actions" class="next-actions hidden"></div>
+<div id="migrate-actions-row" class="next-actions">
+  <a href="{{ url_for('main.migrate') }}" class="btn btn-secondary btn-back">&larr; Back to Migrate options</a>
+  <a id="proceed-to-deploy-link" href="{{ url_for('main.activate') }}" class="btn btn-accent hidden">Proceed to Deploy &rarr;</a>
+</div>
 {% endif %}
 
 <button type="button" id="toggle-advanced" class="link-button">Open execution logs</button>
 <pre id="log" class="hidden"></pre>
-
-{% if job.action == "migrate" %}
-<div id="back-to-audit" class="hidden">
-  <a id="back-to-audit-link" href="#" class="btn btn-secondary">&larr; Back to audit</a>
-</div>
-{% endif %}
 
 <script>
   const streamUrl = "{{ url_for('main.job_stream', job_id=job.id) }}";
@@ -48,18 +51,6 @@
     const nowHidden = logEl.classList.toggle("hidden");
     toggleBtn.textContent = nowHidden ? "Open execution logs" : "Hide execution logs";
   });
-
-  if ("{{ job.action }}" === "migrate") {
-    const sourceAuditKey = "ssmigrator:source-audit-job";
-    const auditJobId = sessionStorage.getItem(sourceAuditKey);
-    sessionStorage.removeItem(sourceAuditKey);
-    if (auditJobId) {
-      const backWrap = document.getElementById("back-to-audit");
-      const backLink = document.getElementById("back-to-audit-link");
-      backLink.href = "{{ url_for('main.job_view', job_id='JOB_ID_PLACEHOLDER') }}".replace("JOB_ID_PLACEHOLDER", auditJobId);
-      backWrap.classList.remove("hidden");
-    }
-  }
 
   const source = new EventSource(streamUrl);
 
@@ -123,44 +114,53 @@
       }
 
       if ("{{ job.action }}" === "migrate") {
-        const migratedFile = "properties_migrated.csv";
+        const migratedFile = fd.migrated_filename;
         const migratedCount = (data.summary && data.summary.migrated) || 0;
-        const hasMigratedFile = migratedCount > 0 && (fd.files || []).includes(migratedFile);
+        const hasMigratedFile = migratedCount > 0 && migratedFile && (fd.files || []).includes(migratedFile);
         const pendingNetworks = fd.pending_networks || [];
-        const networkLabels = { staging: "Staging", production: "Production" };
 
-        const fetchMigratedRows = () =>
-          fetch(downloadBase + encodeURIComponent(migratedFile))
-            .then((r) => r.text())
-            .then((text) => text.trim().split("\n").slice(1).filter(Boolean)
-              .map((line) => line.split(",").slice(0, 2).map((c) => c.trim()).join(",")));
+        const propertyLinks = fd.property_links || [];
+        if (propertyLinks.length) {
+          const list = document.getElementById("go-to-properties-list");
+          propertyLinks.forEach((item) => {
+            const li = document.createElement("li");
+            const a = document.createElement("a");
+            a.href = item.url;
+            a.textContent = item.name;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            li.appendChild(a);
+            list.appendChild(li);
+          });
+          document.getElementById("go-to-properties").classList.remove("hidden");
+        }
 
-        if (hasMigratedFile && fd.activate_option === "both") {
-          // Already pushed to both networks: force the download so the record isn't missed, skip the prompt.
+        if (hasMigratedFile) {
+          // Always hand the customer the migrated list the moment the job finishes.
           const a = document.createElement("a");
           a.href = downloadBase + encodeURIComponent(migratedFile);
           a.download = migratedFile;
           document.body.appendChild(a);
           a.click();
           a.remove();
-        } else if (hasMigratedFile && pendingNetworks.length) {
-          const wrap = document.getElementById("migrate-next-actions");
-          pendingNetworks.forEach((network) => {
-            const btn = document.createElement("a");
-            btn.href = "{{ url_for('main.activate') }}";
-            btn.className = "btn btn-secondary";
-            btn.textContent = `Activate to ${networkLabels[network]} \u2192`;
-            btn.addEventListener("click", (e) => {
-              e.preventDefault();
-              fetchMigratedRows().then((rows) => {
+        }
+
+        if (hasMigratedFile && pendingNetworks.length) {
+          const deployLink = document.getElementById("proceed-to-deploy-link");
+          deployLink.classList.remove("hidden");
+          deployLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            fetch(downloadBase + encodeURIComponent(migratedFile))
+              .then((r) => r.text())
+              .then((text) => {
+                const rows = text.trim().split("\n").slice(1).filter(Boolean)
+                  .map((line) => line.split(",").slice(0, 2).map((c) => c.trim()).join(","));
                 sessionStorage.setItem("ssmigrator:prefill-activation", rows.join("\n"));
-                sessionStorage.setItem("ssmigrator:prefill-activation-network", network);
-                window.location.href = btn.href;
+                sessionStorage.setItem("ssmigrator:prefill-activation-networks", JSON.stringify(pendingNetworks));
+                sessionStorage.setItem("ssmigrator:source-migrate-job", "{{ job.id }}");
+                window.location.href = deployLink.href;
               });
-            });
-            wrap.appendChild(btn);
           });
-          wrap.classList.remove("hidden");
         }
       }
     });

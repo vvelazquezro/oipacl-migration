@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import queue
+import re
 import threading
 import time
 import uuid
@@ -41,8 +42,9 @@ class Job:
     summary: dict | None = None  # friendly counts shown on completion
     charts: dict | None = None  # {chart_key: [{"label":, "count":, "names": [...]}]} for audit/migrate jobs
     names: list | None = None  # original property list, for audit jobs, so Migrate can be prefilled
-    activate_option: str | None = None  # migrate jobs only: "none" | "staging" | "production" | "both"
     pending_networks: list | None = None  # migrate jobs only: networks not yet activated, so Activate can be prefilled
+    migrated_filename: str | None = None  # migrate jobs only: name of the always-downloaded migrated-properties CSV
+    property_links: list | None = None  # migrate jobs only: [{"name":, "url":}] deep links into Control Center
     created_at: float = field(default_factory=time.time)
     log_queue: "queue.Queue" = field(default_factory=queue.Queue)
     log_lines: list = field(default_factory=list)  # full log, retained so it can be downloaded after the job ends
@@ -73,6 +75,18 @@ def _make_job_logger(job: Job) -> logging.Logger:
 _SURE_ROUTE_LABELS = {"Missing": "No SureRoute", "CUSTOM_MAP": "Custom Map", "PERFORMANCE": "Performance"}
 
 
+def _safe_filename_part(value: str) -> str:
+    """Sanitizes an account switch key for safe use in a downloaded filename."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "_", value).strip("_") or "default"
+
+
+def _papi_console_url(asset_id: str, group_id: str, version) -> str:
+    """Builds a Control Center deep link straight into the migrated version's rule tree editor."""
+    aid = str(asset_id).removeprefix("aid_")
+    gid = str(group_id).removeprefix("grp_")
+    return f"https://control.akamai.com/apps/property-manager/#/property-version/{aid}/{version}/edit?gid={gid}"
+
+
 def _bucket_audit_rows(rows, col_idx, label_fn):
     """Groups resolved audit rows by a labeled column, for the results charts."""
     buckets = {}
@@ -92,23 +106,14 @@ def build_audit_charts(rows: list[list]) -> dict:
     }
 
 
-def build_migrate_charts(to_activate: list[list], skipped: list[list], errors: list[list],
-                          activation_succeeded: list[list] | None = None, activation_errors: list[list] | None = None) -> dict:
-    charts = {
+def build_migrate_charts(to_activate: list[list], skipped: list[list], errors: list[list]) -> dict:
+    return {
         "migration": [
             {"label": "Migrated", "count": len(to_activate), "names": [r[0] for r in to_activate]},
             {"label": "Skipped", "count": len(skipped), "names": [r[0] for r in skipped]},
             {"label": "Failed", "count": len(errors), "names": [r[0] for r in errors]},
         ],
     }
-    if activation_succeeded is not None or activation_errors is not None:
-        activation_succeeded = activation_succeeded or []
-        activation_errors = activation_errors or []
-        charts["activation"] = [
-            {"label": "Activated", "count": len(activation_succeeded), "names": [r[0] for r in activation_succeeded]},
-            {"label": "Activation Failed", "count": len(activation_errors), "names": [r[0] for r in activation_errors]},
-        ]
-    return charts
 
 
 class JobManager:
@@ -163,57 +168,38 @@ class JobManager:
                     skipped = result["skipped"]
                     errors = result["errors"]
 
-                    activate_option = params.get("activate_option", "none")
-                    activation_succeeded: list = []
-                    activation_errors: list = []
-
-                    if activate_option != "none" and to_activate:
-                        networks = {"staging": ["staging"], "production": ["production"], "both": ["staging", "production"]}[activate_option]
-                        rows = [[name, str(version)] for name, version in to_activate]
-                        for network in networks:
-                            logger.info("Auto-activating %d migrated propert(ies) to %s...", len(rows), network)
-                            act_result = activate_properties(client, rows, network, params["account_key"], params["notes"],
-                                                              params["notify_email"], params["peer_reviewer_email"],
-                                                              logger, on_progress=on_progress)
-                            activation_succeeded.extend([n, v, network] for n, v in act_result["succeeded"])
-                            activation_errors.extend([n, v, network, reason] for n, v, reason in act_result["errors"])
-
-                    job.files = {"properties_migrated.csv": (ACTIVATE_HEADERS, to_activate)}
+                    job.migrated_filename = f"migrated_properties_{_safe_filename_part(params['account_key'])}.csv"
+                    job.files = {job.migrated_filename: (ACTIVATE_HEADERS, to_activate)}
                     if skipped:
                         job.files["migration_skipped.csv"] = (MIGRATE_SKIPPED_HEADERS, skipped)
                     if errors:
                         job.files["migration_errors.csv"] = (MIGRATE_ERROR_HEADERS, errors)
-                    if activation_succeeded or activation_errors:
-                        combined = [[n, v, net, "Success"] for n, v, net in activation_succeeded] + \
-                                   [[n, v, net, reason] for n, v, net, reason in activation_errors]
-                        job.files["activation_results.csv"] = (
-                            ["Configuration name", "Configuration version", "Network", "Status"], combined)
 
                     job.summary = {"migrated": len(to_activate), "skipped": len(skipped), "failed": len(errors)}
-                    if activate_option != "none":
-                        job.summary["activated"] = len(activation_succeeded)
-                        job.summary["activation_failed"] = len(activation_errors)
+                    job.charts = build_migrate_charts(to_activate, skipped, errors)
 
-                    job.charts = build_migrate_charts(
-                        to_activate, skipped, errors,
-                        activation_succeeded if activate_option != "none" else None,
-                        activation_errors if activate_option != "none" else None,
-                    )
-
-                    job.activate_option = activate_option
-                    activated_networks = {
-                        "none": [], "staging": ["staging"], "production": ["production"], "both": ["staging", "production"],
-                    }[activate_option]
-                    job.pending_networks = [n for n in ("staging", "production") if n not in activated_networks] if to_activate else []
+                    # Activation always happens as a separate, explicit step after migration.
+                    job.pending_networks = ["staging", "production"] if to_activate else []
+                    job.property_links = [
+                        {"name": name, "url": _papi_console_url(aid, gid, version)}
+                        for name, version, _pid, gid, aid in to_activate if aid
+                    ]
 
                 elif job.action == "activate":
-                    result = activate_properties(client, params["rows"], params["version"], params["account_key"],
-                                                  params["notes"], params["notify_email"], params["peer_reviewer_email"],
-                                                  logger, on_progress=on_progress)
-                    combined = [[n, v, "Success"] for n, v in result["succeeded"]] + \
-                               [[n, v, reason] for n, v, reason in result["errors"]]
-                    job.files = {"activation_results.csv": (["Configuration name", "Configuration version", "Status"], combined)}
-                    job.summary = {"succeeded": len(result["succeeded"]), "failed": len(result["errors"])}
+                    networks = {"staging": ["staging"], "production": ["production"], "both": ["staging", "production"]}[params["version"]]
+                    succeeded: list = []
+                    errors: list = []
+                    for network in networks:
+                        result = activate_properties(client, params["rows"], network, params["account_key"],
+                                                      params["notes"], params["notify_email"], params["peer_reviewer_email"],
+                                                      logger, on_progress=on_progress)
+                        succeeded.extend([n, v, network] for n, v in result["succeeded"])
+                        errors.extend([n, v, network, reason] for n, v, reason in result["errors"])
+                    combined = [[n, v, net, "Success"] for n, v, net in succeeded] + \
+                               [[n, v, net, reason] for n, v, net, reason in errors]
+                    job.files = {"activation_results.csv": (
+                        ["Configuration name", "Configuration version", "Network", "Status"], combined)}
+                    job.summary = {"succeeded": len(succeeded), "failed": len(errors)}
 
             logger.info("Job complete.")
             job.status = "done"

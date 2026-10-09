@@ -130,9 +130,6 @@ def migrate():
                         "account_key": creds.get("account_switch_key", ""), "notes": form.notes.data or "SiteShield Migration to OIPACL",
                         "enable_td": form.enable_tiered_distribution.data,
                         "add_oipacl_without_ss": form.add_oipacl_without_siteshield.data,
-                        "activate_option": form.activate_option.data,
-                        "notify_email": form.notify_email.data.strip() if form.notify_email.data else "",
-                        "peer_reviewer_email": (form.peer_reviewer_email.data or "").strip(),
                     },
                 )
                 return redirect(url_for("main.job_view", job_id=job_id))
@@ -157,11 +154,14 @@ def activate():
             elif len(rows) > max_props:
                 form.activation_text.errors.append(f"Too many rows ({len(rows)}); limit is {max_props}.")
             else:
+                notes = form.notes.data or "SiteShield Migration to OIPACL"
+                if form.pr_link.data:
+                    notes = f"{notes} | PR: {form.pr_link.data.strip()}"
                 job_id = current_app.job_manager.submit(
                     "activate", creds,
                     {
                         "rows": rows, "version": form.environment.data,
-                        "account_key": creds.get("account_switch_key", ""), "notes": form.notes.data or "SiteShield Migration to OIPACL",
+                        "account_key": creds.get("account_switch_key", ""), "notes": notes,
                         "notify_email": form.notify_email.data.strip(),
                         "peer_reviewer_email": (form.peer_reviewer_email.data or "").strip(),
                     },
@@ -199,8 +199,9 @@ def job_files(job_id):
         "status": job.status, "error": job.error,
         "files": sorted((job.files or {}).keys()), "charts": job.charts,
         "names": job.names or [],
-        "activate_option": job.activate_option,
         "pending_networks": job.pending_networks or [],
+        "migrated_filename": job.migrated_filename,
+        "property_links": job.property_links or [],
     })
 
 

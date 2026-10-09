@@ -177,6 +177,14 @@ button { font: inherit; cursor: pointer; }
 .btn-primary:hover { background: #0087B3; transform: translateY(-1px); box-shadow: 0 6px 18px 0 rgba(var(--color-primary-rgb), 0.38); }
 .btn-secondary { background: var(--color-surface); color: #334155; border-color: var(--color-border); }
 .btn-secondary:hover { background: #F8FAFC; border-color: #CBD5E1; }
+.btn-accent {
+  background: var(--color-secondary); color: #fff;
+  box-shadow: 0 4px 14px 0 rgba(var(--color-secondary-rgb), 0.30);
+}
+.btn-accent:hover { background: #E6822E; transform: translateY(-1px); box-shadow: 0 6px 18px 0 rgba(var(--color-secondary-rgb), 0.38); }
+.btn-back { margin-right: auto; }
+
+.form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; margin-top: 1.25rem; }
 
 *:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.35); border-radius: var(--radius-md); }
 
@@ -249,6 +257,20 @@ progress#progress-bar::-moz-progress-bar { background: var(--color-primary); bor
   background: var(--color-surface); transition: transform var(--transition-base), border-color var(--transition-base), background-color var(--transition-base);
 }
 .download-link:hover { transform: translateY(-1px); border-color: var(--color-tint-border); background: var(--color-tint-bg); }
+
+.go-to-properties {
+  margin: 0 0 1.25rem; padding: 0.7rem 1rem; border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); background: var(--color-surface);
+}
+.go-to-properties summary {
+  cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--color-primary); list-style: none;
+}
+.go-to-properties summary::-webkit-details-marker { display: none; }
+.go-to-properties summary::before { content: "▸"; display: inline-block; margin-right: 0.4rem; transition: transform var(--transition-base); }
+.go-to-properties[open] summary::before { transform: rotate(90deg); }
+.go-to-properties ul { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.go-to-properties li a { color: var(--color-tint-text); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+.go-to-properties li a:hover { text-decoration: underline; }
 
 .next-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.6rem; margin: -0.5rem 0 1.25rem; }
 

@@ -6,7 +6,7 @@ from .client import PapiClient
 from .properties import get_property_rules, resolve_property
 from .transforms import has_oipacl, has_ss, replace_siteShield, update_sureRoute
 
-ACTIVATE_HEADERS = ["Configuration name", "Configuration version"]
+ACTIVATE_HEADERS = ["Configuration name", "Configuration version", "Property ID", "Group ID", "Asset ID"]
 ERROR_HEADERS = ["Configuration name", "Configuration version", "Error Detail"]
 SKIPPED_HEADERS = ["Configuration name", "Configuration version", "Reason"]
 
@@ -74,7 +74,9 @@ def migrate_properties(client: PapiClient, names: list[str], env_target: str, ac
 
             upd_res = client.put(f"/papi/v1/properties/{base_info['propertyId']}/versions/{new_v}/rules", tree, params)
             if "propertyVersion" in upd_res:
-                to_activate.append([name, upd_res["propertyVersion"]])
+                to_activate.append([
+                    name, upd_res["propertyVersion"], base_info["propertyId"], base_info["groupId"], base_info.get("assetId", ""),
+                ])
                 logger.info("Migrated %s to v%s", name, upd_res["propertyVersion"])
             else:
                 logger.error("Failed to save rules for %s. Response: %s", name, upd_res)
