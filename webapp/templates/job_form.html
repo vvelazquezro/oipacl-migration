@@ -112,5 +112,48 @@
   })();
 </script>
 {% endif %}
+
+{% if action == "activate" %}
+<dialog id="prod-warning-modal" style="border: none; border-radius: var(--radius-xl); padding: 1.75rem; max-width: 420px; box-shadow: var(--shadow-modal);">
+  <h2>Production Activation Requirement</h2>
+  <p>To activate changes in production, you must have complied with the due change management process and passed the peer review process.</p>
+  <form method="dialog" style="text-align: right; margin-top: 1.25rem;">
+    <button class="btn btn-primary">I Understand</button>
+  </form>
+</dialog>
+
+<script>
+  (function () {
+    const envSelect = document.getElementById("environment");
+    const modal = document.getElementById("prod-warning-modal");
+    
+    const ackField = document.getElementById("change_management_ack")?.closest('.field');
+    const emailField = document.getElementById("peer_reviewer_email")?.closest('.field');
+    const jiraField = document.getElementById("jira_link")?.closest('.field');
+
+    if (!envSelect) return;
+
+    function toggleProductionFields() {
+      const isProd = envSelect.value === "production" || envSelect.value === "both";
+      
+      if (isProd && envSelect.dataset.prevValue !== "production" && envSelect.dataset.prevValue !== "both") {
+        modal.showModal();
+      }
+      
+      envSelect.dataset.prevValue = envSelect.value;
+
+      if (ackField) ackField.style.display = isProd ? "flex" : "none";
+      if (emailField) emailField.style.display = isProd ? "block" : "none";
+      if (jiraField) jiraField.style.display = isProd ? "block" : "none";
+    }
+
+    envSelect.dataset.prevValue = envSelect.value;
+    toggleProductionFields();
+
+    envSelect.addEventListener("change", toggleProductionFields);
+  })();
+</script>
+{% endif %}
+
 {% endblock %}
 

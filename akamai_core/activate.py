@@ -29,13 +29,21 @@ def activate_single(client: PapiClient, name: str, version: str, network: str, a
 
     prop = items[0]
     notify_emails = [e.strip() for e in notify_email.split(",") if e.strip()]
+    
+    # Payload base (el campo 'note' ya incluye el JIRA Link concatenado desde routes.py)
     payload = {
         "propertyVersion": int(version), "network": network.upper(), "note": notes,
         "notifyEmails": notify_emails, "acknowledgeAllWarnings": True,
         "activationType": "ACTIVATE", "ignoreHttpErrors": True, "canFastFallback": True,
     }
+    
+    # Requisito obligatorio de Change Management para pases a Producción
     if network.lower() == "production":
-        payload["complianceRecord"] = {"noncomplianceReason": "EMERGENCY", "peerReviewedBy": peer_reviewer_email, "unitTested": True}
+        payload["complianceRecord"] = {
+            "noncomplianceReason": "EMERGENCY", 
+            "peerReviewedBy": peer_reviewer_email, 
+            "unitTested": True
+        }
 
     logger.info("--- Activating: %s v%s ---", name, version)
     try:
@@ -80,9 +88,15 @@ def activate_properties(client: PapiClient, rows: list[list], network: str, acco
         name, version = row[0], row[1]
         if on_progress:
             on_progress(idx, total, name)
-        ok, reason = activate_single(client, name, version, network, account_key, notes, notify_email, peer_reviewer_email, logger)
+        
+        ok, reason = activate_single(
+            client, name, version, network, account_key, 
+            notes, notify_email, peer_reviewer_email, logger
+        )
+        
         if ok:
             succeeded.append([name, version])
         else:
             errors.append([name, version, reason])
+            
     return {"succeeded": succeeded, "errors": errors}

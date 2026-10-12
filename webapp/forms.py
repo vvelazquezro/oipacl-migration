@@ -57,6 +57,8 @@ class MigrateForm(PropertyListForm):
     )
 
 
+from wtforms.validators import DataRequired, Email, Length, Optional, Regexp, URL, ValidationError
+
 class ActivateForm(FlaskForm, _NotifyEmailMixin):
     activation_file = FileField("Upload activation CSV (name,version)", validators=[Optional(), FileAllowed(["csv", "txt"], "CSV or text files only")])
     activation_text = TextAreaField("Or paste rows as name,version (one per line)", validators=[Optional()])
@@ -66,16 +68,32 @@ class ActivateForm(FlaskForm, _NotifyEmailMixin):
     )
     notes = StringField("Notes", default="SiteShield Migration to OIPACL", validators=[Optional(), Length(max=500)])
     notify_email = StringField("Notify Email(s) (comma-separated for multiple)", validators=[DataRequired(), Length(max=1000)])
-    peer_reviewer_email = StringField("Peer Reviewer Email (required for production or both)", validators=[Optional(), Email(), Length(max=255)])
-    pr_link = StringField("Pull Request Link (required for production or both)", validators=[Optional(), URL(), Length(max=500)])
+    
+    # Nuevos campos para Producción
+    change_management_ack = BooleanField(
+        "I have read the change management requirements and agree.", 
+        validators=[Optional()]
+    )
+    peer_reviewer_email = StringField(
+        "Peer Reviewer Email (@akamai.com)", 
+        validators=[Optional(), Email(), Regexp(r'^[a-zA-Z0-9_.+-]+@akamai\.com$', message="Email must be an @akamai.com address"), Length(max=255)]
+    )
+    jira_link = StringField(
+        "JIRA Peer Review Link", 
+        validators=[Optional(), URL(), Length(max=500)]
+    )
 
     def validate_notify_email(self, field):
         self._validate_notify_addresses(field.data)
+
+    def validate_change_management_ack(self, field):
+        if self.environment.data in ("production", "both") and not field.data:
+            raise ValidationError("You must acknowledge the change management process to activate to production.")
 
     def validate_peer_reviewer_email(self, field):
         if self.environment.data in ("production", "both") and not field.data:
             raise ValidationError("Peer reviewer email is required when activating to production.")
 
-    def validate_pr_link(self, field):
+    def validate_jira_link(self, field):
         if self.environment.data in ("production", "both") and not field.data:
-            raise ValidationError("Pull request link is required when activating to production.")
+            raise ValidationError("JIRA peer review link is required when activating to production.")
