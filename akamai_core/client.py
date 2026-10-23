@@ -6,9 +6,16 @@ thread to silently die (threading swallows SystemExit) without the job ever
 reporting a failure, so every call here is caught and re-raised as
 PapiRequestError instead.
 """
+import time
 import urllib.parse
 
 from .errors import PapiRequestError
+
+# post_request/put_request never retry on timeout (unlike get_request), so do a single
+# retry here too -- activations occasionally take longer than the request timeout to
+# respond even though they went through, and a retry is safe since Akamai treats an
+# already-in-flight activation request as a no-op ("already being activated").
+_WRITE_RETRY_DELAY_SECONDS = 15
 
 
 class PapiClient:
@@ -26,15 +33,20 @@ class PapiClient:
         self._api.set_request_url(url, apply_switchkey=False)
         if body is not None:
             self._api.set_request_body(body)
-        try:
-            if method == "get":
-                self._api.get_request(0)
-            elif method == "post":
-                self._api.post_request()
-            elif method == "put":
-                self._api.put_request()
-        except SystemExit as exc:
-            raise PapiRequestError(f"{method.upper()} {endpoint} failed (network/timeout error)") from exc
+        for attempt in range(2):
+            try:
+                if method == "get":
+                    self._api.get_request(0)
+                elif method == "post":
+                    self._api.post_request()
+                elif method == "put":
+                    self._api.put_request()
+                break
+            except SystemExit as exc:
+                if method in ("post", "put") and attempt == 0:
+                    time.sleep(_WRITE_RETRY_DELAY_SECONDS)
+                    continue
+                raise PapiRequestError(f"{method.upper()} {endpoint} failed (network/timeout error)") from exc
 
         res = self._api.get_response_body()
         return res if isinstance(res, dict) else {"error_raw": str(res)}

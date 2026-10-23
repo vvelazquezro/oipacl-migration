@@ -15,6 +15,7 @@ from .client import PapiClient
 
 EDGERC_SECTION = "default"
 REQUIRED_FIELDS = ("host", "client_token", "client_secret", "access_token")
+REQUEST_TIMEOUT_SECONDS = 60  # library default of 30s is too tight for slower activation calls
 
 
 def validate_credentials(creds: dict) -> None:
@@ -46,6 +47,8 @@ def build_client(creds: dict):
         api_caller.set_edgerc(path)
         api_caller.set_section(EDGERC_SECTION)
         api_caller.auth_api()
+        # Activations can take well over the library's default 30s on Akamai's side.
+        api_caller.request_timeout = REQUEST_TIMEOUT_SECONDS
 
         yield PapiClient(api_caller)
     finally:
@@ -60,4 +63,5 @@ def build_client_from_edgerc(path: str, section: str = EDGERC_SECTION):
     api_caller.set_edgerc(os.path.expanduser(path))
     api_caller.set_section(section)
     api_caller.auth_api()
+    api_caller.request_timeout = REQUEST_TIMEOUT_SECONDS
     yield PapiClient(api_caller)

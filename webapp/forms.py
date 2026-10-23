@@ -69,7 +69,7 @@ class ActivateForm(FlaskForm, _NotifyEmailMixin):
     notes = StringField("Notes", default="SiteShield Migration to OIPACL", validators=[Optional(), Length(max=500)])
     notify_email = StringField("Notify Email(s) (comma-separated for multiple)", validators=[DataRequired(), Length(max=1000)])
     
-    # Nuevos campos para Producción
+    # New fields for Production
     change_management_ack = BooleanField(
         "I have read the change management requirements and agree.", 
         validators=[Optional()]
@@ -79,7 +79,7 @@ class ActivateForm(FlaskForm, _NotifyEmailMixin):
         validators=[Optional(), Email(), Regexp(r'^[a-zA-Z0-9_.+-]+@akamai\.com$', message="Email must be an @akamai.com address"), Length(max=255)]
     )
     jira_link = StringField(
-        "JIRA Peer Review Link", 
+        "PR Link", 
         validators=[Optional(), URL(), Length(max=500)]
     )
 
@@ -96,4 +96,4 @@ class ActivateForm(FlaskForm, _NotifyEmailMixin):
 
     def validate_jira_link(self, field):
         if self.environment.data in ("production", "both") and not field.data:
-            raise ValidationError("JIRA peer review link is required when activating to production.")
+            raise ValidationError("PR link is required when activating to production.")

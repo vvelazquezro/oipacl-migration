@@ -30,14 +30,14 @@ def activate_single(client: PapiClient, name: str, version: str, network: str, a
     prop = items[0]
     notify_emails = [e.strip() for e in notify_email.split(",") if e.strip()]
     
-    # Payload base (el campo 'note' ya incluye el JIRA Link concatenado desde routes.py)
+    # Base payload (the 'note' field already includes the PR link appended in routes.py)
     payload = {
         "propertyVersion": int(version), "network": network.upper(), "note": notes,
         "notifyEmails": notify_emails, "acknowledgeAllWarnings": True,
         "activationType": "ACTIVATE", "ignoreHttpErrors": True, "canFastFallback": True,
     }
     
-    # Requisito obligatorio de Change Management para pases a Producción
+    # Mandatory Change Management requirement for Production releases
     if network.lower() == "production":
         payload["complianceRecord"] = {
             "noncomplianceReason": "EMERGENCY", 

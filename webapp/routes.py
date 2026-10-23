@@ -155,8 +155,8 @@ def activate():
                 form.activation_text.errors.append(f"Too many rows ({len(rows)}); limit is {max_props}.")
             else:
                 notes = form.notes.data or "SiteShield Migration to OIPACL"
-                if form.pr_link.data:
-                    notes = f"{notes} | PR: {form.pr_link.data.strip()}"
+                if form.jira_link.data:
+                    notes = f"{notes} | {form.jira_link.data.strip()}"
                 job_id = current_app.job_manager.submit(
                     "activate", creds,
                     {
