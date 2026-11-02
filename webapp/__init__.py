@@ -26,6 +26,11 @@ def create_app():
 
     if not os.environ.get("FLASK_SECRET_KEY"):
         logging.warning("FLASK_SECRET_KEY not set; using an ephemeral key generated at startup.")
+    if not app.config["REQUIRE_GSAP_AUTH"]:
+        logging.warning("REQUIRE_GSAP_AUTH is disabled; do not disable this outside local dev.")
+
+    from .health import bp as health_bp
+    app.register_blueprint(health_bp)
 
     from .routes import bp
     app.register_blueprint(bp)

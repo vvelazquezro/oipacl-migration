@@ -1,4 +1,4 @@
-from flask import Blueprint, abort, current_app, g, redirect, render_template, session, url_for
+from flask import Blueprint, abort, current_app, g, redirect, render_template, request, session, url_for
 from flask import Response, jsonify, stream_with_context
 
 from akamai_core.csv_utils import parse_activation_rows, parse_property_rows, rows_to_csv_bytes
@@ -22,6 +22,22 @@ def _creds_from_form(form):
         "client_secret": form.client_secret.data.strip(),
         "access_token": form.access_token.data.strip(),
     }
+
+
+@bp.before_request
+def _enforce_gsap_identity():
+    """Denies any request that didn't come through GSAP's Gateway as an allowed akamai.com user.
+
+    GSAP's Gateway forwards the signed-in user's email in X-Auth-Request-Email on every
+    protected request. Trust it only because this blueprint is only reachable behind that
+    Gateway in production; reject direct access and unexpected email domains either way.
+    """
+    if not current_app.config["REQUIRE_GSAP_AUTH"]:
+        return None
+    email = request.headers.get(current_app.config["GSAP_AUTH_EMAIL_HEADER"], "")
+    domain = current_app.config["ALLOWED_EMAIL_DOMAIN"].lower()
+    if not email or not email.lower().endswith(f"@{domain}"):
+        abort(403)
 
 
 @bp.before_request

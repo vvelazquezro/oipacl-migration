@@ -35,15 +35,6 @@ Each Audit/Migrate/Activate submission runs as an isolated background job with a
 
 ---
 
-## Running Locally
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-FLASK_SECRET_KEY=dev APP_ROOT_PATH=/ss-migrator python3 app.py
-# visit http://localhost:8080/ss-migrator/
-```
-
 The app listens on plain HTTP port `8080` and must be reachable under `APP_ROOT_PATH` (a reverse proxy is expected to forward the full path, including the prefix, without stripping it).
 
 ---
@@ -84,8 +75,17 @@ Copy `.env.example` to `.env` and fill in real values for local runs (`.env` is 
 | `MAX_CONCURRENT_JOBS` | No | Max number of Audit/Migrate/Activate jobs run in parallel (default `5`). |
 | `MAX_PROPERTIES_PER_JOB` | No | Max property rows accepted per job submission (default `1000`). |
 | `CREDENTIAL_TTL_SECONDS` | No | How long a connected session's credentials stay in server memory before expiring (default `3600`). |
+| `REQUIRE_GSAP_AUTH` | No | Enforces that every request carries an `X-Auth-Request-Email` header from an allowed domain (default `true`). Set to `false` only for local dev without a GSAP Gateway in front; never disable in production. |
+| `ALLOWED_EMAIL_DOMAIN` | No | Email domain required in `X-Auth-Request-Email` when `REQUIRE_GSAP_AUTH` is enabled (default `akamai.com`). |
 
 No Akamai credentials are supplied via environment variables — they are entered once per session through the connect dialog.
+
+---
+
+## Health Checks
+
+- `GET /readyz` and `GET /livez` are unauthenticated, unprefixed (no `APP_ROOT_PATH`) and always return `200` once the process is serving requests — this app has no external dependency to wait on at startup. Intended for GSAP's APL Workload readiness/liveness probes, which hit the pod IP and container port directly.
+- `GET /<APP_ROOT_PATH>/` (the index page) requires no Akamai credentials to load and can serve as the GSAP Service-level availability check, but it is still gated by the GSAP Gateway and by this app's own `X-Auth-Request-Email` check.
 
 ---
 
